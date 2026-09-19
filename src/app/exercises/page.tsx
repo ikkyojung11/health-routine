@@ -166,40 +166,46 @@ function ExercisesContent() {
       </div>
 
       {/* Search Input */}
-      <div className="relative">
+      <div className="relative mb-2">
         <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="기구 이름 또는 타겟 부위 검색 (예: 벤치, 랫풀, 스쿼트)"
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+          className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 shadow-sm"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-1"
           >
             <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      {/* Category Pills Slider */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-              selectedCategory === cat
-                ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20 scale-105'
-                : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+      {/* Category Tabs Section with comfortable separation and thumb-friendly buttons */}
+      <div className="pt-2 pb-1">
+        <div className="flex items-center justify-between mb-2.5 px-0.5">
+          <span className="text-xs font-bold text-zinc-300">운동 부위 선택</span>
+          <span className="text-[11px] text-zinc-500 font-medium">좌우 스크롤 가능</span>
+        </div>
+        <div className="flex items-center space-x-2.5 overflow-x-auto pb-2 scrollbar-none py-1">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold shrink-0 transition-all min-h-[42px] flex items-center justify-center ${
+                selectedCategory === cat
+                  ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/25 scale-[1.03]'
+                  : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800 border border-zinc-800/90 hover:border-zinc-700'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Exercise Cards List */}

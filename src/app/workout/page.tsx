@@ -541,32 +541,45 @@ export default function WorkoutPage() {
             </div>
 
             {/* Search */}
-            <div className="relative mb-3">
-              <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="relative mb-3.5">
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={modalSearch}
                 onChange={(e) => setModalSearch(e.target.value)}
                 placeholder="기구 이름 검색 (벤치, 랫풀, 스쿼트 등)"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 shadow-sm"
               />
+              {modalSearch && (
+                <button
+                  onClick={() => setModalSearch('')}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
-            {/* Category tabs */}
-            <div className="flex items-center space-x-1.5 overflow-x-auto pb-2 scrollbar-none mb-3">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setModalCategory(cat)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                    modalCategory === cat
-                      ? 'bg-emerald-500 text-zinc-950'
-                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+            {/* Category tabs with comfortable spacing & touch target */}
+            <div className="mb-3.5">
+              <div className="text-[11px] font-bold text-zinc-400 mb-2 px-0.5">
+                운동 부위 선택
+              </div>
+              <div className="flex items-center space-x-2 overflow-x-auto pb-1.5 scrollbar-none">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setModalCategory(cat)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all min-h-[38px] flex items-center justify-center ${
+                      modalCategory === cat
+                        ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/25 scale-[1.02]'
+                        : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700/60'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Exercise List */}

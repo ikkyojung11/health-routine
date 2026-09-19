@@ -104,19 +104,19 @@ function AnalyticsContent() {
       </div>
 
       {/* Category Pills Filter */}
-      <div>
-        <label className="block text-xs font-bold text-zinc-400 mb-2">
+      <div className="space-y-2">
+        <label className="block text-xs font-bold text-zinc-300">
           부위 선택 후 기구를 골라보세요
         </label>
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-2 scrollbar-none">
+        <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none py-1">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat as ExerciseCategory | '전체')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all ${
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold shrink-0 transition-all min-h-[40px] flex items-center justify-center ${
                 selectedCategory === cat
-                  ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20'
-                  : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+                  ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20 scale-[1.02]'
+                  : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800 border border-zinc-800'
               }`}
             >
               {cat}
