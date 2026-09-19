@@ -10,37 +10,35 @@ import {
   Flame,
   ChevronRight,
   Sparkles,
-  Award,
   ArrowUpRight,
   Clock,
+  Plus,
 } from 'lucide-react';
-import { getWorkoutSessions, getExerciseGrowthStats } from '@/lib/storage';
-import { WorkoutSession, ExerciseCategory } from '@/lib/types';
+import { getWorkoutSessions, getExerciseGrowthStats, getExercises } from '@/lib/storage';
+import { WorkoutSession, ExerciseCategory, ExerciseGrowthStats } from '@/lib/types';
 
 export default function HomePage() {
   const [recentSessions, setRecentSessions] = useState<WorkoutSession[]>([]);
-  const [benchGrowth, setBenchGrowth] = useState<number | null>(null);
-  const [latGrowth, setLatGrowth] = useState<number | null>(null);
-  const [legGrowth, setLegGrowth] = useState<number | null>(null);
+  const [topGrowingExercises, setTopGrowingExercises] = useState<ExerciseGrowthStats[]>([]);
 
   useEffect(() => {
     const sessions = getWorkoutSessions();
     setRecentSessions(sessions.slice(0, 3));
 
-    const benchStats = getExerciseGrowthStats('chest-bench-press');
-    if (benchStats && benchStats.growthKg > 0) {
-      setBenchGrowth(benchStats.growthKg);
+    // Calculate actual real growth from recorded exercises
+    const allEx = getExercises();
+    const growingList: ExerciseGrowthStats[] = [];
+
+    for (const ex of allEx) {
+      const stats = getExerciseGrowthStats(ex.id);
+      if (stats && stats.history.length >= 1) {
+        growingList.push(stats);
+      }
     }
 
-    const latStats = getExerciseGrowthStats('back-lat-pulldown');
-    if (latStats && latStats.growthKg > 0) {
-      setLatGrowth(latStats.growthKg);
-    }
-
-    const legStats = getExerciseGrowthStats('leg-press-machine');
-    if (legStats && legStats.growthKg > 0) {
-      setLegGrowth(legStats.growthKg);
-    }
+    // Sort by growthKg descending
+    growingList.sort((a, b) => b.growthKg - a.growthKg);
+    setTopGrowingExercises(growingList.slice(0, 3));
   }, []);
 
   const categories: { name: ExerciseCategory; color: string; desc: string; icon: string }[] = [
@@ -143,29 +141,29 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-3 bg-zinc-950/60 rounded-2xl border border-zinc-800/80">
-            <div className="text-[10px] text-zinc-400">벤치프레스</div>
-            <div className="text-sm font-black text-emerald-400 mt-1">
-              {benchGrowth ? `+${benchGrowth}kg` : '+10kg'}
+        {topGrowingExercises.length === 0 ? (
+          <div className="py-6 px-4 text-center bg-zinc-950/60 rounded-2xl border border-zinc-800/80">
+            <TrendingUp className="w-8 h-8 mx-auto text-zinc-600 mb-2" />
+            <div className="text-xs font-bold text-zinc-300">아직 등록된 운동 기록이 없습니다</div>
+            <div className="text-[11px] text-zinc-500 mt-1 max-w-xs mx-auto leading-relaxed">
+              운동을 기록하시면 기구별 중량 성장률과 최고 기록이 이곳에 자동으로 요약됩니다!
             </div>
-            <div className="text-[9px] text-emerald-500/80 font-semibold mt-0.5">성장 중 🔥</div>
           </div>
-          <div className="p-3 bg-zinc-950/60 rounded-2xl border border-zinc-800/80">
-            <div className="text-[10px] text-zinc-400">랫풀다운</div>
-            <div className="text-sm font-black text-emerald-400 mt-1">
-              {latGrowth ? `+${latGrowth}kg` : '+15kg'}
-            </div>
-            <div className="text-[9px] text-emerald-500/80 font-semibold mt-0.5">성장 중 🔥</div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {topGrowingExercises.map((stats) => (
+              <div key={stats.exerciseId} className="p-3 bg-zinc-950/60 rounded-2xl border border-zinc-800/80">
+                <div className="text-[10px] text-zinc-400 truncate">{stats.exerciseName}</div>
+                <div className="text-sm font-black text-emerald-400 mt-1">
+                  {stats.growthKg > 0 ? `+${stats.growthKg}kg` : `${stats.allTimeMaxWeight}kg`}
+                </div>
+                <div className="text-[9px] text-emerald-500/80 font-semibold mt-0.5">
+                  {stats.growthKg > 0 ? '성장 중 🔥' : '기록 완료'}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="p-3 bg-zinc-950/60 rounded-2xl border border-zinc-800/80">
-            <div className="text-[10px] text-zinc-400">레그프레스</div>
-            <div className="text-sm font-black text-emerald-400 mt-1">
-              {legGrowth ? `+${legGrowth}kg` : '+20kg'}
-            </div>
-            <div className="text-[9px] text-emerald-500/80 font-semibold mt-0.5">성장 중 🔥</div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Beginner Gym Tip Card */}
@@ -192,8 +190,23 @@ export default function HomePage() {
         </div>
 
         {recentSessions.length === 0 ? (
-          <div className="p-6 text-center bg-zinc-900/50 border border-zinc-800 rounded-2xl text-xs text-zinc-400">
-            아직 저장된 운동 일지가 없습니다. 지금 첫 운동을 기록해보세요!
+          <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800 rounded-3xl space-y-3">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-500">
+              <Dumbbell className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-zinc-300">작성된 운동 일지가 없습니다</div>
+              <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto leading-relaxed">
+                오늘 헬스장에 가셔서 첫 번째 운동 일지를 작성해보세요!
+              </p>
+            </div>
+            <Link
+              href="/workout"
+              className="inline-flex items-center space-x-1.5 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-emerald-500/20"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" />
+              <span>첫 운동일지 작성하기</span>
+            </Link>
           </div>
         ) : (
           <div className="space-y-3">

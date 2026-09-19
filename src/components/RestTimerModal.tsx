@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Timer, X, Play, Pause, RotateCcw, Plus, Minus, Volume2, Music } from 'lucide-react';
+import { Timer, X, Play, Pause, RotateCcw, Plus, Minus, Volume2 } from 'lucide-react';
 
 interface RestTimerProps {
   isOpen: boolean;
@@ -9,17 +9,14 @@ interface RestTimerProps {
   defaultSeconds?: number;
 }
 
-type SoundType = 'chime' | 'boxing' | 'digital';
-
 export default function RestTimerModal({ isOpen, onClose, defaultSeconds = 60 }: RestTimerProps) {
   const [timeLeft, setTimeLeft] = useState<number>(defaultSeconds);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [initialDuration, setInitialDuration] = useState<number>(defaultSeconds);
-  const [selectedSound, setSelectedSound] = useState<SoundType>('chime');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Play pleasant, crisp gym chime sound
-  const playAlertSound = useCallback((soundType: SoundType = selectedSound) => {
+  // 맑은 차임벨 단일 사운드 재생 (도-미-솔-도 4화음 맑은 벨 소리)
+  const playAlertSound = useCallback(() => {
     try {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtxClass) return;
@@ -27,70 +24,32 @@ export default function RestTimerModal({ isOpen, onClose, defaultSeconds = 60 }:
       const audioCtx = new AudioCtxClass();
       const now = audioCtx.currentTime;
 
-      if (soundType === 'chime') {
-        // 맑고 경쾌한 4음 멜로디 차임 (도-미-솔-도)
-        const notes = [
-          { freq: 523.25, time: 0.00, dur: 0.4 }, // C5
-          { freq: 659.25, time: 0.12, dur: 0.4 }, // E5
-          { freq: 783.99, time: 0.24, dur: 0.4 }, // G5
-          { freq: 1046.50, time: 0.36, dur: 0.8 }, // C6 (길게 울림)
-        ];
+      // 맑고 청명한 4음 멜로디 차임 (C5 - E5 - G5 - C6)
+      const notes = [
+        { freq: 523.25, time: 0.00, dur: 0.4 }, // C5
+        { freq: 659.25, time: 0.12, dur: 0.4 }, // E5
+        { freq: 783.99, time: 0.24, dur: 0.4 }, // G5
+        { freq: 1046.50, time: 0.36, dur: 0.8 }, // C6 (길고 풍성하게 울림)
+      ];
 
-        notes.forEach(({ freq, time, dur }) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
+      notes.forEach(({ freq, time, dur }) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
 
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, now + time);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + time);
 
-          // Percussive bell attack & decay
-          gain.gain.setValueAtTime(0, now + time);
-          gain.gain.linearRampToValueAtTime(0.35, now + time + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + time + dur);
+        // Percussive bell attack & smooth exponential decay
+        gain.gain.setValueAtTime(0, now + time);
+        gain.gain.linearRampToValueAtTime(0.35, now + time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + time + dur);
 
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
 
-          osc.start(now + time);
-          osc.stop(now + time + dur);
-        });
-      } else if (soundType === 'boxing') {
-        // 복싱 라운드 벨 (딩~! 묵직하고 울리는 벨)
-        const partials = [587.33, 880, 1174.66, 1760];
-        partials.forEach((freq, idx) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
-          osc.frequency.setValueAtTime(freq, now);
-
-          const volume = 0.35 / (idx + 1);
-          gain.gain.setValueAtTime(volume, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-
-          osc.start(now);
-          osc.stop(now + 1.2);
-        });
-      } else {
-        // 경쾌한 3단 전자 비프음
-        [0, 0.15, 0.3].forEach((offset) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(987.77, now + offset); // B5
-
-          gain.gain.setValueAtTime(0.3, now + offset);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.1);
-
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-
-          osc.start(now + offset);
-          osc.stop(now + offset + 0.1);
-        });
-      }
+        osc.start(now + time);
+        osc.stop(now + time + dur);
+      });
 
       if (navigator.vibrate) {
         navigator.vibrate([200, 100, 200, 100, 300]);
@@ -98,7 +57,7 @@ export default function RestTimerModal({ isOpen, onClose, defaultSeconds = 60 }:
     } catch (e) {
       console.error('Audio alert playback error', e);
     }
-  }, [selectedSound]);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -179,14 +138,14 @@ export default function RestTimerModal({ isOpen, onClose, defaultSeconds = 60 }:
         <div className="flex items-center justify-center space-x-3 mb-5">
           <button
             onClick={() => adjustTime(-15)}
-            className="flex items-center space-x-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full text-xs font-bold"
+            className="flex items-center space-x-1 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full text-xs font-bold transition-colors"
           >
             <Minus className="w-3.5 h-3.5" />
             <span>15초</span>
           </button>
           <button
             onClick={() => adjustTime(15)}
-            className="flex items-center space-x-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full text-xs font-bold"
+            className="flex items-center space-x-1 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-full text-xs font-bold transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>15초</span>
@@ -210,44 +169,18 @@ export default function RestTimerModal({ isOpen, onClose, defaultSeconds = 60 }:
           ))}
         </div>
 
-        {/* Sound Selection & Preview */}
-        <div className="bg-zinc-950/70 p-3 rounded-2xl border border-zinc-800/80 mb-5">
-          <div className="flex items-center justify-between text-[11px] text-zinc-400 font-bold mb-2">
-            <span className="flex items-center gap-1">
-              <Music className="w-3.5 h-3.5 text-emerald-400" />
-              알림 소리 선택
-            </span>
-            <button
-              onClick={() => playAlertSound()}
-              className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 text-[10px] font-semibold"
-            >
-              <Volume2 className="w-3 h-3" />
-              <span>소리 들어보기</span>
-            </button>
+        {/* Single Chime Sound Indicator & Preview */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-950/70 border border-zinc-800/80 rounded-2xl mb-6">
+          <div className="flex items-center space-x-2 text-xs text-zinc-300 font-semibold">
+            <Volume2 className="w-4 h-4 text-emerald-400" />
+            <span>알림 소리: 맑은 차임벨</span>
           </div>
-
-          <div className="grid grid-cols-3 gap-1.5">
-            {[
-              { id: 'chime', label: '맑은 차임벨' },
-              { id: 'boxing', label: '복싱 라운드' },
-              { id: 'digital', label: '전자 비프' },
-            ].map((snd) => (
-              <button
-                key={snd.id}
-                onClick={() => {
-                  setSelectedSound(snd.id as SoundType);
-                  playAlertSound(snd.id as SoundType);
-                }}
-                className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all ${
-                  selectedSound === snd.id
-                    ? 'bg-emerald-500 text-zinc-950 shadow-sm'
-                    : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
-                }`}
-              >
-                {snd.label}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={playAlertSound}
+            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-[11px] font-bold rounded-lg transition-colors"
+          >
+            소리 듣기
+          </button>
         </div>
 
         {/* Main Control Actions */}

@@ -11,6 +11,7 @@ import { syncSessionToSupabase } from './supabase';
 const STORAGE_KEY_EXERCISES = 'health_routine_exercises';
 const STORAGE_KEY_SESSIONS = 'health_routine_sessions';
 const STORAGE_KEY_ACTIVE_SESSION = 'health_routine_active_session';
+const STORAGE_KEY_CLEANED_DEMO = 'health_routine_cleaned_demo_v2';
 
 // ==================== EXERCISES ====================
 
@@ -20,12 +21,11 @@ export function getExercises(): Exercise[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_EXERCISES);
     if (!raw) {
-      // First time initialization with defaults
       localStorage.setItem(STORAGE_KEY_EXERCISES, JSON.stringify(DEFAULT_EXERCISES));
       return DEFAULT_EXERCISES;
     }
     const parsed: Exercise[] = JSON.parse(raw);
-    
+
     // Merge any missing default exercises in case new ones were added
     const existingIds = new Set(parsed.map((e) => e.id));
     const missingDefaults = DEFAULT_EXERCISES.filter((d) => !existingIds.has(d.id));
@@ -66,16 +66,38 @@ export function getWorkoutSessions(): WorkoutSession[] {
   if (typeof window === 'undefined') return [];
 
   try {
+    // One-time automatic purge of legacy demo sessions
+    const hasPurgedDemo = localStorage.getItem(STORAGE_KEY_CLEANED_DEMO);
     const raw = localStorage.getItem(STORAGE_KEY_SESSIONS);
-    if (!raw) {
-      // Initialize with realistic beginner starter history so analytics looks great right away!
-      const starterSessions = generateStarterSessions();
-      localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(starterSessions));
-      return starterSessions;
+
+    if (!hasPurgedDemo) {
+      localStorage.setItem(STORAGE_KEY_CLEANED_DEMO, 'true');
+      if (raw) {
+        try {
+          const existing: WorkoutSession[] = JSON.parse(raw);
+          const nonDemo = existing.filter((s) => !s.id.startsWith('demo-session-'));
+          localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(nonDemo));
+          return nonDemo.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        } catch {
+          localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify([]));
+          return [];
+        }
+      }
     }
+
+    if (!raw) {
+      return [];
+    }
+
     const parsed: WorkoutSession[] = JSON.parse(raw);
+    // Filter out any lingering demo data
+    const cleaned = parsed.filter((s) => !s.id.startsWith('demo-session-'));
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(cleaned));
+    }
+
     // Sort descending by date
-    return parsed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return cleaned.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   } catch (e) {
     console.error('Failed to get sessions from localStorage', e);
     return [];
@@ -161,7 +183,6 @@ export function getExerciseGrowthStats(exerciseId: string): ExerciseGrowthStats 
   if (!exercise) return null;
 
   const sessions = getWorkoutSessions();
-  // Sessions sorted ascending by date for chronological trend
   const chronologicalSessions = [...sessions].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
@@ -245,196 +266,4 @@ export function getExerciseGrowthStats(exerciseId: string): ExerciseGrowthStats 
     growthPercentage,
     totalSessionsCount: history.length,
   };
-}
-
-// ==================== STARTER DEMO DATA ====================
-
-function generateStarterSessions(): WorkoutSession[] {
-  // Generates 4 realistic beginner workout logs over the past month so users can explore immediately!
-  const today = new Date();
-  
-  const formatDate = (daysAgo: number) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - daysAgo);
-    return d.toISOString().split('T')[0];
-  };
-
-  return [
-    {
-      id: 'demo-session-1',
-      date: formatDate(21),
-      title: '첫 가슴 & 팔 헬스 시작!',
-      durationMinutes: 45,
-      notes: '처음으로 헬스장 등록하고 기구 사용법 익힘. 무리하지 않고 가볍게 시작함!',
-      totalVolume: 3200,
-      totalSets: 9,
-      logs: [
-        {
-          id: 'log-1-1',
-          exerciseId: 'chest-press-machine',
-          exerciseName: '체스트 프레스 머신',
-          category: '가슴',
-          sets: [
-            { id: 's1', setNumber: 1, weight: 20, reps: 12, completed: true },
-            { id: 's2', setNumber: 2, weight: 25, reps: 10, completed: true },
-            { id: 's3', setNumber: 3, weight: 25, reps: 10, completed: true },
-          ],
-        },
-        {
-          id: 'log-1-2',
-          exerciseId: 'chest-bench-press',
-          exerciseName: '바벨 벤치프레스',
-          category: '가슴',
-          sets: [
-            { id: 's4', setNumber: 1, weight: 30, reps: 10, completed: true },
-            { id: 's5', setNumber: 2, weight: 30, reps: 10, completed: true },
-            { id: 's6', setNumber: 3, weight: 35, reps: 8, completed: true },
-          ],
-        },
-        {
-          id: 'log-1-3',
-          exerciseId: 'arm-cable-pushdown',
-          exerciseName: '케이블 트라이셉스 푸시다운 (로프/바)',
-          category: '팔',
-          sets: [
-            { id: 's7', setNumber: 1, weight: 15, reps: 15, completed: true },
-            { id: 's8', setNumber: 2, weight: 15, reps: 12, completed: true },
-            { id: 's9', setNumber: 3, weight: 20, reps: 10, completed: true },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'demo-session-2',
-      date: formatDate(14),
-      title: '등 & 하체 루틴',
-      durationMinutes: 50,
-      notes: '랫풀다운 자세가 조금씩 잡히는 것 같음. 하체 레그프레스 굿!',
-      totalVolume: 5100,
-      totalSets: 9,
-      logs: [
-        {
-          id: 'log-2-1',
-          exerciseId: 'back-lat-pulldown',
-          exerciseName: '랫 풀 다운 머신',
-          category: '등',
-          sets: [
-            { id: 's10', setNumber: 1, weight: 25, reps: 12, completed: true },
-            { id: 's11', setNumber: 2, weight: 30, reps: 10, completed: true },
-            { id: 's12', setNumber: 3, weight: 30, reps: 10, completed: true },
-          ],
-        },
-        {
-          id: 'log-2-2',
-          exerciseId: 'leg-press-machine',
-          exerciseName: '레그 프레스 머신',
-          category: '하체',
-          sets: [
-            { id: 's13', setNumber: 1, weight: 50, reps: 15, completed: true },
-            { id: 's14', setNumber: 2, weight: 60, reps: 12, completed: true },
-            { id: 's15', setNumber: 3, weight: 70, reps: 10, completed: true },
-          ],
-        },
-        {
-          id: 'log-2-3',
-          exerciseId: 'arm-barbell-curl',
-          exerciseName: '이지바 / 바벨 바이셉스 컬',
-          category: '팔',
-          sets: [
-            { id: 's16', setNumber: 1, weight: 15, reps: 12, completed: true },
-            { id: 's17', setNumber: 2, weight: 15, reps: 10, completed: true },
-            { id: 's18', setNumber: 3, weight: 20, reps: 8, completed: true },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'demo-session-3',
-      date: formatDate(7),
-      title: '가슴 증량 성공!',
-      durationMinutes: 55,
-      notes: '벤치프레스 40kg 8회 성공! 무게가 점점 가볍게 느껴진다.',
-      totalVolume: 4200,
-      totalSets: 9,
-      logs: [
-        {
-          id: 'log-3-1',
-          exerciseId: 'chest-press-machine',
-          exerciseName: '체스트 프레스 머신',
-          category: '가슴',
-          sets: [
-            { id: 's19', setNumber: 1, weight: 30, reps: 12, completed: true },
-            { id: 's20', setNumber: 2, weight: 35, reps: 10, completed: true },
-            { id: 's21', setNumber: 3, weight: 35, reps: 10, completed: true },
-          ],
-        },
-        {
-          id: 'log-3-2',
-          exerciseId: 'chest-bench-press',
-          exerciseName: '바벨 벤치프레스',
-          category: '가슴',
-          sets: [
-            { id: 's22', setNumber: 1, weight: 35, reps: 10, completed: true },
-            { id: 's23', setNumber: 2, weight: 40, reps: 8, completed: true },
-            { id: 's24', setNumber: 3, weight: 40, reps: 8, completed: true },
-          ],
-        },
-        {
-          id: 'log-3-3',
-          exerciseId: 'arm-cable-pushdown',
-          exerciseName: '케이블 트라이셉스 푸시다운 (로프/바)',
-          category: '팔',
-          sets: [
-            { id: 's25', setNumber: 1, weight: 20, reps: 12, completed: true },
-            { id: 's26', setNumber: 2, weight: 25, reps: 10, completed: true },
-            { id: 's27', setNumber: 3, weight: 25, reps: 10, completed: true },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'demo-session-4',
-      date: formatDate(2),
-      title: '등 & 하체 볼륨 업',
-      durationMinutes: 55,
-      notes: '랫풀다운 40kg 달성! 레그프레스 90kg까지 올림.',
-      totalVolume: 6700,
-      totalSets: 9,
-      logs: [
-        {
-          id: 'log-4-1',
-          exerciseId: 'back-lat-pulldown',
-          exerciseName: '랫 풀 다운 머신',
-          category: '등',
-          sets: [
-            { id: 's28', setNumber: 1, weight: 30, reps: 12, completed: true },
-            { id: 's29', setNumber: 2, weight: 35, reps: 10, completed: true },
-            { id: 's30', setNumber: 3, weight: 40, reps: 8, completed: true },
-          ],
-        },
-        {
-          id: 'log-4-2',
-          exerciseId: 'leg-press-machine',
-          exerciseName: '레그 프레스 머신',
-          category: '하체',
-          sets: [
-            { id: 's31', setNumber: 1, weight: 70, reps: 12, completed: true },
-            { id: 's32', setNumber: 2, weight: 80, reps: 10, completed: true },
-            { id: 's33', setNumber: 3, weight: 90, reps: 10, completed: true },
-          ],
-        },
-        {
-          id: 'log-4-3',
-          exerciseId: 'arm-barbell-curl',
-          exerciseName: '이지바 / 바벨 바이셉스 컬',
-          category: '팔',
-          sets: [
-            { id: 's34', setNumber: 1, weight: 17.5, reps: 10, completed: true },
-            { id: 's35', setNumber: 2, weight: 20, reps: 10, completed: true },
-            { id: 's36', setNumber: 3, weight: 22.5, reps: 8, completed: true },
-          ],
-        },
-      ],
-    },
-  ];
 }
