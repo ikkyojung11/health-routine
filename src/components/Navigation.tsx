@@ -2,21 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Dumbbell, Home, TrendingUp, BookOpen, Settings } from 'lucide-react';
+import { Dumbbell, Home, TrendingUp, BookOpen, Sparkles } from 'lucide-react';
 
 export default function Navigation() {
   const pathname = usePathname();
 
   const navItems = [
     { label: '홈', href: '/', icon: Home },
-    { label: '기구목차', href: '/exercises', icon: BookOpen },
+    { label: '추천루틴', href: '/routines', icon: Sparkles },
     { label: '운동일지', href: '/workout', icon: Dumbbell, isPrimary: true },
+    { label: '기구목차', href: '/exercises', icon: BookOpen },
     { label: '성장분석', href: '/analytics', icon: TrendingUp },
-    { label: '설정', href: '/settings', icon: Settings },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800/80 px-2 py-2 max-w-md mx-auto sm:max-w-lg md:max-w-2xl">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800/80 px-1.5 py-2 max-w-md mx-auto sm:max-w-lg md:max-w-2xl">
       <div className="flex items-center justify-around">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -49,7 +49,7 @@ export default function Navigation() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center py-1 px-3 rounded-lg transition-colors ${
+              className={`flex flex-col items-center py-1 px-2 rounded-lg transition-colors ${
                 isActive ? 'text-emerald-400 font-bold' : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >

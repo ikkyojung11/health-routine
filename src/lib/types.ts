@@ -71,3 +71,25 @@ export interface SupabaseConfig {
   anonKey: string;
   isConnected?: boolean;
 }
+
+export interface RoutineExercise {
+  exerciseId: string;
+  recommendedSets: number;
+  recommendedReps: number;
+  recommendedRestSec: number;
+  tips?: string;
+}
+
+export interface WorkoutRoutine {
+  id: string;
+  title: string;
+  subtitle: string;
+  splitType: '3분할' | '2분할' | '무분할 (전신)';
+  dayLabel: string; // e.g. "Day 1", "Day 2", "전신"
+  targetCategories: ExerciseCategory[];
+  difficulty: '초보자 입문 (1~4주)' | '초보자 중급 (2~6개월)' | '누구나 가능';
+  estimatedMinutes: number;
+  description: string;
+  exercises: RoutineExercise[];
+  guideTips: string[];
+}

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import {
   Dumbbell,
@@ -17,6 +18,9 @@ import {
   Search,
   History,
   TrendingUp,
+  BookOpen,
+  ArrowRight,
+  Clock,
 } from 'lucide-react';
 import SetInputRow from '@/components/SetInputRow';
 import RestTimerModal from '@/components/RestTimerModal';
@@ -27,22 +31,30 @@ import {
   getExercises,
   getLastWorkoutLogForExercise,
 } from '@/lib/storage';
+import { RECOMMENDED_ROUTINES } from '@/data/recommendedRoutines';
 import {
   WorkoutSession,
   WorkoutExerciseLog,
   WorkoutSet,
   Exercise,
-  ExerciseCategory,
+  WorkoutRoutine,
 } from '@/lib/types';
 
-export default function WorkoutPage() {
+function WorkoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const routineParam = searchParams.get('routineId');
 
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [allExercises, setAllExercises] = useState<Exercise[]>([]);
+
+  // Exercise picker modal
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
   const [modalCategory, setModalCategory] = useState<string>('전체');
   const [modalSearch, setModalSearch] = useState<string>('');
+
+  // Routine picker modal
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
   // Rest Timer State
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -53,14 +65,25 @@ export default function WorkoutPage() {
   const [isFinishedModalOpen, setIsFinishedModalOpen] = useState(false);
 
   useEffect(() => {
-    setAllExercises(getExercises());
+    const exercisesList = getExercises();
+    setAllExercises(exercisesList);
 
-    // Load active session or create new one for today
+    const today = new Date().toISOString().split('T')[0];
+
+    // If query param routineId is provided, load that routine!
+    if (routineParam) {
+      const routine = RECOMMENDED_ROUTINES.find((r) => r.id === routineParam);
+      if (routine) {
+        applyRoutineToWorkout(routine, exercisesList);
+        return;
+      }
+    }
+
+    // Otherwise load active draft or create new session
     const existing = getActiveSession();
     if (existing) {
       setSession(existing);
     } else {
-      const today = new Date().toISOString().split('T')[0];
       const newSession: WorkoutSession = {
         id: `session-${Date.now()}`,
         date: today,
@@ -72,7 +95,7 @@ export default function WorkoutPage() {
       setSession(newSession);
       saveActiveSession(newSession);
     }
-  }, []);
+  }, [routineParam]);
 
   // Recalculate totals whenever session changes
   const updateSessionState = (updated: WorkoutSession) => {
@@ -96,6 +119,46 @@ export default function WorkoutPage() {
 
     setSession(finalSession);
     saveActiveSession(finalSession);
+  };
+
+  // Apply a routine's exercises into the workout session
+  const applyRoutineToWorkout = (routine: WorkoutRoutine, exList?: Exercise[]) => {
+    const exercises = exList || allExercises;
+    const today = new Date().toISOString().split('T')[0];
+
+    const logs: WorkoutExerciseLog[] = routine.exercises.map((re, exIdx) => {
+      const foundEx = exercises.find((e) => e.id === re.exerciseId);
+      const sets: WorkoutSet[] = Array.from({ length: re.recommendedSets }, (_, setIdx) => ({
+        id: `set-${Date.now()}-${exIdx}-${setIdx + 1}`,
+        setNumber: setIdx + 1,
+        weight: 0,
+        reps: re.recommendedReps,
+        completed: false,
+      }));
+
+      return {
+        id: `log-${Date.now()}-${exIdx}`,
+        exerciseId: re.exerciseId,
+        exerciseName: foundEx ? foundEx.name : re.exerciseId,
+        category: foundEx ? foundEx.category : '가슴',
+        sets,
+        notes: re.tips,
+      };
+    });
+
+    const newSession: WorkoutSession = {
+      id: `session-${Date.now()}`,
+      date: today,
+      title: routine.title,
+      durationMinutes: routine.estimatedMinutes,
+      logs,
+      totalVolume: 0,
+      totalSets: logs.reduce((sum, l) => sum + l.sets.length, 0),
+      notes: `${routine.subtitle} (추천 루틴 적용)`,
+    };
+
+    updateSessionState(newSession);
+    setIsRoutineModalOpen(false);
   };
 
   // Add Exercise to current session
@@ -150,7 +213,7 @@ export default function WorkoutPage() {
     updateSessionState({ ...session, logs: updatedLogs });
   };
 
-  // Add Set to Exercise
+  // Add Set to Exercise (inherits last set's weight & reps automatically)
   const handleAddSet = (logId: string) => {
     if (!session) return;
     const updatedLogs = session.logs.map((log) => {
@@ -175,14 +238,34 @@ export default function WorkoutPage() {
     updateSessionState({ ...session, logs: updatedLogs });
   };
 
-  // Update a single set
+  // Update a single set with automatic propagation to subsequent uncompleted sets!
   const handleUpdateSet = (logId: string, updatedSet: WorkoutSet) => {
     if (!session) return;
     const updatedLogs = session.logs.map((log) => {
       if (log.id !== logId) return log;
+
+      const targetIndex = log.sets.findIndex((s) => s.id === updatedSet.id);
+      const oldSet = log.sets[targetIndex];
+
       return {
         ...log,
-        sets: log.sets.map((s) => (s.id === updatedSet.id ? updatedSet : s)),
+        sets: log.sets.map((s, idx) => {
+          if (s.id === updatedSet.id) return updatedSet;
+
+          // 1세트(또는 현재 세트) 변경 시 아직 완료되지 않은 다음 세트들에 기본값 자동 반영!
+          if (idx > targetIndex && !s.completed) {
+            const isWeightUntouched = s.weight === 0 || (oldSet && s.weight === oldSet.weight);
+            const isRepsUntouched = s.reps === 0 || (oldSet && s.reps === oldSet.reps);
+
+            return {
+              ...s,
+              weight: isWeightUntouched ? updatedSet.weight : s.weight,
+              reps: isRepsUntouched ? updatedSet.reps : s.reps,
+            };
+          }
+
+          return s;
+        }),
       };
     });
 
@@ -195,7 +278,6 @@ export default function WorkoutPage() {
     const updatedLogs = session.logs.map((log) => {
       if (log.id !== logId) return log;
       const filtered = log.sets.filter((s) => s.id !== setId);
-      // Renumber
       const renumbered = filtered.map((s, idx) => ({ ...s, setNumber: idx + 1 }));
       return { ...log, sets: renumbered };
     });
@@ -203,7 +285,7 @@ export default function WorkoutPage() {
     updateSessionState({ ...session, logs: updatedLogs });
   };
 
-  // Toggle set completion
+  // Toggle set completion + auto copy to next set if next set is empty
   const handleToggleComplete = (logId: string, setId: string) => {
     if (!session) return;
 
@@ -211,15 +293,33 @@ export default function WorkoutPage() {
 
     const updatedLogs = session.logs.map((log) => {
       if (log.id !== logId) return log;
+      const targetIndex = log.sets.findIndex((s) => s.id === setId);
+
+      const newSets = log.sets.map((s) => {
+        if (s.id === setId) {
+          willBeCompleted = !s.completed;
+          return { ...s, completed: willBeCompleted };
+        }
+        return s;
+      });
+
+      // 1세트 완료 시 2세트(다음 세트)에 직전 세트의 중량/횟수를 기본값으로 자동 채우기!
+      if (willBeCompleted && targetIndex >= 0 && targetIndex < newSets.length - 1) {
+        const completedSet = newSets[targetIndex];
+        const nextSet = newSets[targetIndex + 1];
+
+        if (!nextSet.completed && (nextSet.weight === 0 || nextSet.reps === 0)) {
+          newSets[targetIndex + 1] = {
+            ...nextSet,
+            weight: completedSet.weight,
+            reps: completedSet.reps,
+          };
+        }
+      }
+
       return {
         ...log,
-        sets: log.sets.map((s) => {
-          if (s.id === setId) {
-            willBeCompleted = !s.completed;
-            return { ...s, completed: willBeCompleted };
-          }
-          return s;
-        }),
+        sets: newSets,
       };
     });
 
@@ -252,14 +352,13 @@ export default function WorkoutPage() {
   const handleFinishWorkout = () => {
     if (!session) return;
 
-    // Filter out exercises with no sets or zero weight
     const completedSession: WorkoutSession = {
       ...session,
       createdAt: new Date().toISOString(),
     };
 
     saveWorkoutSession(completedSession);
-    saveActiveSession(null); // Clear active draft
+    saveActiveSession(null);
 
     // Fire Confetti!
     try {
@@ -332,13 +431,23 @@ export default function WorkoutPage() {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Routine Picker Button */}
+          <button
+            onClick={() => setIsRoutineModalOpen(true)}
+            className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold transition-all shadow-sm"
+            title="초보자 추천 루틴 가져오기"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>추천 루틴</span>
+          </button>
+
           {/* Quick Timer Button */}
           <button
             onClick={() => setIsTimerOpen(true)}
-            className="flex items-center space-x-1 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-emerald-400 rounded-xl text-xs font-bold transition-all"
+            className="flex items-center space-x-1 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 rounded-xl text-xs font-bold transition-all"
             title="휴식 타이머 열기"
           >
-            <Timer className="w-3.5 h-3.5" />
+            <Timer className="w-3.5 h-3.5 text-emerald-400" />
             <span>타이머</span>
           </button>
 
@@ -362,6 +471,11 @@ export default function WorkoutPage() {
           placeholder="오늘의 운동 제목 (예: 가슴 & 삼두 파괴)"
           className="w-full bg-transparent text-xl font-black text-white placeholder-zinc-600 focus:outline-none"
         />
+        {session.notes && (
+          <div className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+            {session.notes}
+          </div>
+        )}
       </div>
 
       {/* Real-time Summary Card */}
@@ -394,23 +508,34 @@ export default function WorkoutPage() {
       {/* Exercise Logs */}
       <div className="space-y-4">
         {session.logs.length === 0 ? (
-          <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/80 rounded-3xl space-y-3">
+          <div className="p-8 text-center bg-zinc-900/40 border border-zinc-800/80 rounded-3xl space-y-4">
             <div className="w-14 h-14 mx-auto rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-500">
               <Dumbbell className="w-7 h-7" />
             </div>
             <div>
               <h3 className="text-base font-bold text-zinc-200">운동 기구를 추가해주세요</h3>
-              <p className="text-xs text-zinc-400 mt-1 max-w-xs mx-auto">
-                가슴, 등, 하체, 팔 등 오늘 헬스장에서 할 기구를 선택하여 일지를 시작하세요.
+              <p className="text-xs text-zinc-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                직접 기구를 추가하거나, 초보자 맞춤 추천 루틴을 불러와 바로 시작해보세요!
               </p>
             </div>
-            <button
-              onClick={() => setIsAddExerciseModalOpen(true)}
-              className="inline-flex items-center space-x-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-2xl text-sm transition-all shadow-lg shadow-emerald-500/20"
-            >
-              <Plus className="w-4 h-4" />
-              <span>기구 찾아 추가하기</span>
-            </button>
+
+            <div className="flex flex-col sm:flex-row gap-2 max-w-xs mx-auto">
+              <button
+                onClick={() => setIsRoutineModalOpen(true)}
+                className="flex-1 inline-flex items-center justify-center space-x-1.5 px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-black rounded-2xl text-xs transition-all shadow-lg shadow-emerald-500/20"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>추천 루틴 불러오기</span>
+              </button>
+
+              <button
+                onClick={() => setIsAddExerciseModalOpen(true)}
+                className="flex-1 inline-flex items-center justify-center space-x-1.5 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold rounded-2xl text-xs transition-all border border-zinc-700"
+              >
+                <Plus className="w-4 h-4" />
+                <span>기구 직접 추가</span>
+              </button>
+            </div>
           </div>
         ) : (
           session.logs.map((log) => {
@@ -457,6 +582,12 @@ export default function WorkoutPage() {
                   </div>
                 </div>
 
+                {log.notes && (
+                  <div className="text-[11px] text-zinc-400 bg-zinc-950/60 p-2 rounded-xl border border-zinc-800/50 leading-relaxed">
+                    💡 <strong className="text-zinc-300 font-semibold">팁:</strong> {log.notes}
+                  </div>
+                )}
+
                 {/* Sets List */}
                 <div className="space-y-2">
                   {log.sets.map((set) => (
@@ -477,7 +608,7 @@ export default function WorkoutPage() {
                   className="w-full py-2.5 bg-zinc-800/70 hover:bg-zinc-800 text-zinc-300 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1 border border-zinc-800"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>세트 추가</span>
+                  <span>세트 추가 (직전 세트 중량·횟수 자동 반영)</span>
                 </button>
               </div>
             );
@@ -488,13 +619,22 @@ export default function WorkoutPage() {
       {/* Bottom Action Bar */}
       {session.logs.length > 0 && (
         <div className="space-y-3 pt-2">
-          <button
-            onClick={() => setIsAddExerciseModalOpen(true)}
-            className="w-full py-3.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 border-dashed text-emerald-400 font-bold rounded-2xl text-sm flex items-center justify-center space-x-2 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>다른 기구 추가하기</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsAddExerciseModalOpen(true)}
+              className="flex-1 py-3.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 border-dashed text-emerald-400 font-bold rounded-2xl text-xs flex items-center justify-center space-x-1.5 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>기구 직접 추가</span>
+            </button>
+            <button
+              onClick={() => setIsRoutineModalOpen(true)}
+              className="px-4 py-3.5 bg-zinc-900 hover:bg-zinc-800 border border-emerald-500/30 text-emerald-400 font-bold rounded-2xl text-xs flex items-center justify-center space-x-1.5 transition-all"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>루틴 변경</span>
+            </button>
+          </div>
 
           {/* Auto-timer toggle */}
           <div className="flex items-center justify-between px-2 text-xs text-zinc-400">
@@ -520,6 +660,75 @@ export default function WorkoutPage() {
             <Save className="w-5 h-5" />
             <span>운동 완료 & 저장하기</span>
           </button>
+        </div>
+      )}
+
+      {/* Routine Picker Modal */}
+      {isRoutineModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg max-h-[85vh] bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-400" />
+                초보자 추천 루틴 선택
+              </h3>
+              <button
+                onClick={() => setIsRoutineModalOpen(false)}
+                className="p-1 text-zinc-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400 mb-4">
+              루틴을 선택하면 해당 기구들과 권장 세트수·횟수가 오늘의 일지에 바로 세팅됩니다.
+            </p>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {RECOMMENDED_ROUTINES.map((r) => (
+                <div
+                  key={r.id}
+                  className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl hover:border-emerald-500/40 transition-all space-y-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-emerald-400">
+                      {r.splitType} • {r.difficulty}
+                    </span>
+                    <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-emerald-400" /> 약 {r.estimatedMinutes}분
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-black text-white">{r.title}</h4>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">{r.subtitle}</p>
+                  </div>
+
+                  <div className="text-[10px] text-zinc-500">
+                    기구 {r.exercises.length}개: {r.targetCategories.join(', ')}
+                  </div>
+
+                  <button
+                    onClick={() => applyRoutineToWorkout(r)}
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-black rounded-xl transition-colors flex items-center justify-center space-x-1"
+                  >
+                    <span>이 루틴 적용하기</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-zinc-800 mt-2 text-center">
+              <Link
+                href="/routines"
+                onClick={() => setIsRoutineModalOpen(false)}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-bold"
+              >
+                루틴 상세 가이드 전체보기 →
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
@@ -656,5 +865,13 @@ export default function WorkoutPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function WorkoutPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-zinc-500">일지 불러오는 중...</div>}>
+      <WorkoutContent />
+    </Suspense>
   );
 }

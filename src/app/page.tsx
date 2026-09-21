@@ -13,6 +13,8 @@ import {
   ArrowUpRight,
   Clock,
   Plus,
+  Settings,
+  Zap,
 } from 'lucide-react';
 import { getWorkoutSessions, getExerciseGrowthStats, getExercises } from '@/lib/storage';
 import { WorkoutSession, ExerciseCategory, ExerciseGrowthStats } from '@/lib/types';
@@ -67,8 +69,17 @@ export default function HomePage() {
             오늘도 득근하세요! 🔥
           </h1>
         </div>
-        <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400">
-          <Flame className="w-5 h-5 fill-current" />
+        <div className="flex items-center space-x-2">
+          <Link
+            href="/settings"
+            className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+            title="설정"
+          >
+            <Settings className="w-5 h-5" />
+          </Link>
+          <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400">
+            <Flame className="w-5 h-5 fill-current" />
+          </div>
         </div>
       </div>
 
@@ -90,6 +101,32 @@ export default function HomePage() {
           <div className="w-12 h-12 rounded-2xl bg-zinc-950/20 flex items-center justify-center text-zinc-950 group-hover:translate-x-1 transition-transform">
             <ChevronRight className="w-6 h-6 stroke-[3]" />
           </div>
+        </div>
+      </Link>
+
+      {/* Recommended Routines Card */}
+      <Link
+        href="/routines"
+        className="block p-4 rounded-3xl bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border border-emerald-500/30 hover:border-emerald-500/60 shadow-lg transition-all group"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-start space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 uppercase tracking-wider">
+                  초보자 추천
+                </span>
+                <span className="text-xs font-bold text-white">무엇부터 해야 할지 막막하다면?</span>
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-1">
+                전신 머신 입문, 3분할(가슴/등/하체), 2분할 계획을 1초 만에 불러와 시작하세요!
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-emerald-400 shrink-0 group-hover:translate-x-1 transition-transform ml-2" />
         </div>
       </Link>
 
