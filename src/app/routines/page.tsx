@@ -95,22 +95,43 @@ export default function RoutinesPage() {
         </p>
       </div>
 
-      {/* Beginner FAQ / Guide Banner */}
-      <div className="p-4 bg-zinc-900/90 border border-zinc-800 rounded-2xl space-y-2">
-        <div className="flex items-center space-x-2 text-xs font-bold text-amber-400">
-          <HelpCircle className="w-4 h-4 shrink-0" />
-          <span>초보자는 어떤 루틴을 골라야 할까요?</span>
+      {/* Beginner FAQ / Guide Banners */}
+      <div className="space-y-3">
+        <div className="p-4 bg-zinc-900/90 border border-zinc-800 rounded-2xl space-y-2">
+          <div className="flex items-center space-x-2 text-xs font-bold text-amber-400">
+            <HelpCircle className="w-4 h-4 shrink-0" />
+            <span>초보자는 어떤 루틴을 골라야 할까요?</span>
+          </div>
+          <div className="text-[11px] text-zinc-300 leading-relaxed space-y-1">
+            <p>
+              • <strong className="text-emerald-400">헬스장 1~2주 차</strong>: <strong className="text-white">전신 머신 입문 루틴</strong>으로 머신 셋팅법과 자세를 먼저 익히세요 (주 2~3회).
+            </p>
+            <p>
+              • <strong className="text-emerald-400">주 3~4회 운동 가능</strong>: <strong className="text-white">3분할 루틴 (Day 1 가슴 → Day 2 등 → Day 3 하체)</strong>을 순서대로 돌리는 것이 가장 효과적입니다!
+            </p>
+            <p>
+              • <strong className="text-emerald-400">시간이 부족한 경우</strong>: <strong className="text-white">2분할 루틴 (상체 / 하체)</strong>으로 40분씩 짧고 굵게 진행하세요.
+            </p>
+          </div>
         </div>
-        <div className="text-[11px] text-zinc-300 leading-relaxed space-y-1">
-          <p>
-            • <strong className="text-emerald-400">헬스장 1~2주 차</strong>: <strong className="text-white">전신 머신 입문 루틴</strong>으로 머신 셋팅법과 자세를 먼저 익히세요 (주 2~3회).
-          </p>
-          <p>
-            • <strong className="text-emerald-400">주 3~4회 운동 가능</strong>: <strong className="text-white">3분할 루틴 (Day 1 가슴 → Day 2 등 → Day 3 하체)</strong>을 순서대로 돌리는 것이 가장 효과적입니다!
-          </p>
-          <p>
-            • <strong className="text-emerald-400">시간이 부족한 경우</strong>: <strong className="text-white">2분할 루틴 (상체 / 하체)</strong>으로 40분씩 짧고 굵게 진행하세요.
-          </p>
+
+        {/* Missing machine advice banner */}
+        <div className="p-4 bg-emerald-950/30 border border-emerald-500/20 rounded-2xl space-y-1.5">
+          <div className="flex items-center space-x-2 text-xs font-bold text-emerald-400">
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>헬스장에 이 기구가 없거나 다른 사람이 쓰고 있다면?</span>
+          </div>
+          <div className="text-[11px] text-zinc-300 leading-relaxed space-y-1">
+            <p>
+              • <strong className="text-white">대체 기구 활용</strong>: 헬스는 특정 기구에 얽매일 필요가 없습니다! 각 종목에 적혀 있는 <strong className="text-emerald-400">[대체 가능 기구]</strong>를 대신 하셔도 100% 동일한 근육이 자극됩니다.
+            </p>
+            <p>
+              • <strong className="text-white">영문 명판 확인</strong>: 국내 헬스장 기구는 보통 영문 스티커(Chest Press, Lat Pulldown 등)로 표기되어 있습니다. 각 기구의 영문명을 확인해보세요.
+            </p>
+            <p>
+              • <strong className="text-white">직접 기구 등록</strong>: 운동일지 작성 화면에서 언제든 <strong className="text-emerald-400">[+ 새 기구 직접 등록]</strong>으로 내 헬스장 기구를 추가할 수 있습니다.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -189,22 +210,40 @@ export default function RoutinesPage() {
                 <div className="space-y-2">
                   {routine.exercises.map((re, idx) => {
                     const ex = allExercises.find((e) => e.id === re.exerciseId);
+                    const altList = ex?.alternatives || [];
+
                     return (
                       <div
                         key={re.exerciseId}
-                        className="flex items-center justify-between text-xs p-2 rounded-xl bg-zinc-900/80 border border-zinc-800/60"
+                        className="p-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800/60 space-y-1.5"
                       >
-                        <div className="flex items-center space-x-2.5 min-w-0">
-                          <span className="w-5 h-5 rounded-md bg-zinc-800 text-emerald-400 text-[10px] font-black flex items-center justify-center shrink-0">
-                            {idx + 1}
-                          </span>
-                          <span className="font-bold text-zinc-200 truncate">
-                            {ex ? ex.name : re.exerciseId}
-                          </span>
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <span className="w-5 h-5 rounded-md bg-zinc-800 text-emerald-400 text-[10px] font-black flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <span className="font-bold text-zinc-100 truncate block">
+                                {ex ? ex.name : re.exerciseId}
+                              </span>
+                              {ex?.englishName && (
+                                <span className="text-[10px] text-zinc-500 font-mono block truncate">
+                                  {ex.englishName.split('/')[0].trim()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-zinc-400 font-medium shrink-0 pl-2">
+                            {re.recommendedSets}세트 × {re.recommendedReps}회
+                          </div>
                         </div>
-                        <div className="text-[11px] text-zinc-400 font-medium shrink-0 pl-2">
-                          {re.recommendedSets}세트 × {re.recommendedReps}회
-                        </div>
+
+                        {altList.length > 0 && (
+                          <div className="pl-7 text-[10px] text-amber-400/90 flex items-center gap-1">
+                            <span className="text-zinc-500 shrink-0 font-medium">대체 가능:</span>
+                            <span className="text-zinc-400 truncate">{altList.slice(0, 2).join(', ')}</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

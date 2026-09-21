@@ -43,9 +43,14 @@ function ExercisesContent() {
   const filteredExercises = exercises.filter((ex) => {
     const matchesCategory =
       selectedCategory === '전체' || ex.category === selectedCategory;
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return matchesCategory;
+
     const matchesSearch =
-      ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ex.targetMuscle.toLowerCase().includes(searchQuery.toLowerCase());
+      ex.name.toLowerCase().includes(query) ||
+      (ex.englishName && ex.englishName.toLowerCase().includes(query)) ||
+      ex.targetMuscle.toLowerCase().includes(query) ||
+      (ex.alternatives && ex.alternatives.some((alt) => alt.toLowerCase().includes(query)));
     return matchesCategory && matchesSearch;
   });
 
@@ -161,8 +166,20 @@ function ExercisesContent() {
           className="flex items-center space-x-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 rounded-2xl text-xs font-bold transition-all border border-zinc-700"
         >
           <Plus className="w-4 h-4" />
-          <span>기구 추가</span>
+          <span>기구 직접 추가</span>
         </button>
+      </div>
+
+      {/* Beginner Gym Machine Tips Banner */}
+      <div className="p-3.5 bg-zinc-900/80 border border-zinc-800 rounded-2xl space-y-1.5">
+        <div className="flex items-center space-x-1.5 text-xs font-bold text-amber-400">
+          <Flame className="w-3.5 h-3.5 fill-current" />
+          <span>초보자를 위한 헬스장 기구 찾기 꿀팁</span>
+        </div>
+        <p className="text-[11px] text-zinc-300 leading-relaxed">
+          • 헬스장 기구는 보통 영문 명판(<span className="text-zinc-400 font-mono">Chest Press, Lat Pulldown</span> 등)이나 자극 부위 그림 스티커가 붙어 있습니다.<br />
+          • 찾는 기구가 없거나 다른 사람이 쓰고 있다면, 각 기구의 <strong className="text-emerald-400">[대체 기구]</strong>를 대신 진행하셔도 좋습니다!
+        </p>
       </div>
 
       {/* Search Input */}
@@ -172,7 +189,7 @@ function ExercisesContent() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="기구 이름 또는 타겟 부위 검색 (예: 벤치, 랫풀, 스쿼트)"
+          placeholder="기구 이름 / 영문명 / 대체 운동 검색 (lat, press, 스쿼트 등)"
           className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 shadow-sm"
         />
         {searchQuery && (
@@ -244,9 +261,20 @@ function ExercisesContent() {
                     )}
                   </div>
                   <h3 className="text-base font-bold text-white mt-1.5">{exercise.name}</h3>
-                  <div className="text-xs text-zinc-400 mt-0.5">
+                  {exercise.englishName && (
+                    <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                      {exercise.englishName}
+                    </div>
+                  )}
+                  <div className="text-xs text-zinc-400 mt-1">
                     주요 부위: <span className="text-zinc-300">{exercise.targetMuscle}</span>
                   </div>
+                  {exercise.alternatives && exercise.alternatives.length > 0 && (
+                    <div className="text-[10px] text-amber-400/90 mt-1.5 flex items-center gap-1">
+                      <span className="text-zinc-500 font-medium shrink-0">대체 가능:</span>
+                      <span className="text-zinc-300 truncate">{exercise.alternatives.join(', ')}</span>
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -284,7 +312,7 @@ function ExercisesContent() {
       {selectedExerciseForTips && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <span
                 className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${getCategoryBadgeClass(
                   selectedExerciseForTips.category
@@ -301,11 +329,16 @@ function ExercisesContent() {
             </div>
 
             <h3 className="text-lg font-black text-white">{selectedExerciseForTips.name}</h3>
+            {selectedExerciseForTips.englishName && (
+              <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                {selectedExerciseForTips.englishName}
+              </div>
+            )}
             <div className="text-xs text-zinc-400 mt-1 mb-4">
-              타겟: {selectedExerciseForTips.targetMuscle}
+              타겟: <span className="text-zinc-300">{selectedExerciseForTips.targetMuscle}</span>
             </div>
 
-            <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-2 mb-5">
+            <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-2 mb-3">
               <div className="flex items-center space-x-2 text-xs font-bold text-amber-400">
                 <Flame className="w-4 h-4 fill-current" />
                 <span>초보자 필수 세팅 & 자세 팁</span>
@@ -315,13 +348,31 @@ function ExercisesContent() {
               </p>
             </div>
 
+            {selectedExerciseForTips.alternatives && selectedExerciseForTips.alternatives.length > 0 && (
+              <div className="p-3 bg-zinc-950/80 rounded-2xl border border-zinc-800/80 space-y-1.5 mb-4">
+                <div className="text-[11px] font-bold text-zinc-300">
+                  💡 이 기구가 없을 때 추천 대체 운동
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedExerciseForTips.alternatives.map((alt) => (
+                    <span
+                      key={alt}
+                      className="text-[11px] px-2 py-0.5 bg-zinc-900 text-emerald-400 font-medium rounded-md border border-zinc-800"
+                    >
+                      {alt}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <button
               onClick={() => {
                 const ex = selectedExerciseForTips;
                 setSelectedExerciseForTips(null);
                 handleStartWorkoutWithExercise(ex);
               }}
-              className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-2xl text-sm transition-all"
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-2xl text-sm transition-all shadow-md shadow-emerald-500/20"
             >
               이 기구로 바로 운동 시작하기
             </button>

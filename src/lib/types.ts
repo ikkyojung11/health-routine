@@ -3,9 +3,11 @@ export type ExerciseCategory = '가슴' | '등' | '하체' | '팔' | '어깨' | 
 export interface Exercise {
   id: string;
   name: string;
+  englishName?: string;
   category: ExerciseCategory;
   targetMuscle: string;
   tips: string;
+  alternatives?: string[];
   isCustom?: boolean;
   defaultWeightUnit?: 'kg';
 }
@@ -78,6 +80,7 @@ export interface RoutineExercise {
   recommendedReps: number;
   recommendedRestSec: number;
   tips?: string;
+  alternatives?: string[];
 }
 
 export interface WorkoutRoutine {

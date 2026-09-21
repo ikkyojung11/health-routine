@@ -29,6 +29,7 @@ import {
   saveActiveSession,
   saveWorkoutSession,
   getExercises,
+  saveCustomExercise,
   getLastWorkoutLogForExercise,
 } from '@/lib/storage';
 import { RECOMMENDED_ROUTINES } from '@/data/recommendedRoutines';
@@ -37,6 +38,7 @@ import {
   WorkoutExerciseLog,
   WorkoutSet,
   Exercise,
+  ExerciseCategory,
   WorkoutRoutine,
 } from '@/lib/types';
 
@@ -52,6 +54,12 @@ function WorkoutContent() {
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
   const [modalCategory, setModalCategory] = useState<string>('전체');
   const [modalSearch, setModalSearch] = useState<string>('');
+
+  // Quick custom exercise registration inside workout modal
+  const [isCustomFormOpen, setIsCustomFormOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customCategory, setCustomCategory] = useState<ExerciseCategory>('가슴');
+  const [customTarget, setCustomTarget] = useState('');
 
   // Routine picker modal
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
@@ -391,13 +399,40 @@ function WorkoutContent() {
     }
   };
 
+  const handleCreateAndAddCustomExercise = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customName.trim()) return;
+
+    const newEx = saveCustomExercise({
+      name: customName.trim(),
+      category: customCategory,
+      targetMuscle: customTarget.trim() || `${customCategory} 운동`,
+      tips: '올바른 자세와 부상 방지에 유의하며 수행하세요.',
+    });
+
+    const updated = getExercises();
+    setAllExercises(updated);
+    handleAddExerciseToWorkout(newEx);
+
+    setCustomName('');
+    setCustomTarget('');
+    setIsCustomFormOpen(false);
+    setIsAddExerciseModalOpen(false);
+  };
+
   const categories = ['전체', '가슴', '등', '하체', '팔', '어깨', '복근/코어'];
 
   const filteredExercisesForModal = allExercises.filter((ex) => {
     const matchesCat = modalCategory === '전체' || ex.category === modalCategory;
+    const query = modalSearch.toLowerCase().trim();
+    if (!query) return matchesCat;
+
     const matchesSearch =
-      ex.name.toLowerCase().includes(modalSearch.toLowerCase()) ||
-      ex.targetMuscle.toLowerCase().includes(modalSearch.toLowerCase());
+      ex.name.toLowerCase().includes(query) ||
+      (ex.englishName && ex.englishName.toLowerCase().includes(query)) ||
+      ex.targetMuscle.toLowerCase().includes(query) ||
+      (ex.alternatives && ex.alternatives.some((alt) => alt.toLowerCase().includes(query)));
+
     return matchesCat && matchesSearch;
   });
 
@@ -737,16 +772,31 @@ function WorkoutContent() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-lg max-h-[85vh] bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-black text-white flex items-center gap-2">
+              <div className="flex items-center space-x-2">
                 <Dumbbell className="w-5 h-5 text-emerald-400" />
-                기구 선택
-              </h3>
-              <button
-                onClick={() => setIsAddExerciseModalOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                <h3 className="text-lg font-black text-white">기구 선택</h3>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setCustomName(modalSearch);
+                    if (modalCategory !== '전체') {
+                      setCustomCategory(modalCategory as ExerciseCategory);
+                    }
+                    setIsCustomFormOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 rounded-xl text-xs font-bold transition-all border border-zinc-700 flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>새 기구 직접 등록</span>
+                </button>
+                <button
+                  onClick={() => setIsAddExerciseModalOpen(false)}
+                  className="p-1 text-zinc-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Search */}
@@ -756,7 +806,7 @@ function WorkoutContent() {
                 type="text"
                 value={modalSearch}
                 onChange={(e) => setModalSearch(e.target.value)}
-                placeholder="기구 이름 검색 (벤치, 랫풀, 스쿼트 등)"
+                placeholder="기구 이름 / 영문명 검색 (lat, press, 스쿼트 등)"
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 shadow-sm"
               />
               {modalSearch && (
@@ -793,36 +843,181 @@ function WorkoutContent() {
 
             {/* Exercise List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {filteredExercisesForModal.map((ex) => {
-                const isAlreadyAdded = session.logs.some((l) => l.exerciseId === ex.id);
-                return (
+              {filteredExercisesForModal.length === 0 ? (
+                <div className="p-6 text-center bg-zinc-950/60 rounded-2xl border border-zinc-800/80 space-y-3 my-2">
+                  <p className="text-xs text-zinc-400">
+                    {modalSearch ? `'${modalSearch}' 검색 결과가 없습니다.` : '해당 부위 기구가 없습니다.'}
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    다니시는 헬스장의 기구 명판을 확인하시고 바로 새 기구로 등록해보세요!
+                  </p>
                   <button
-                    key={ex.id}
-                    disabled={isAlreadyAdded}
-                    onClick={() => handleAddExerciseToWorkout(ex)}
-                    className={`w-full text-left p-3 rounded-2xl border transition-all flex items-center justify-between ${
-                      isAlreadyAdded
-                        ? 'bg-zinc-950/40 border-zinc-800/40 opacity-50 cursor-not-allowed'
-                        : 'bg-zinc-950 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-800/50'
-                    }`}
+                    onClick={() => {
+                      setCustomName(modalSearch);
+                      if (modalCategory !== '전체') {
+                        setCustomCategory(modalCategory as ExerciseCategory);
+                      }
+                      setIsCustomFormOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-500 text-zinc-950 font-bold rounded-xl text-xs shadow-md shadow-emerald-500/20"
                   >
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-emerald-400">
-                          {ex.category}
-                        </span>
-                        <span className="text-sm font-bold text-white">{ex.name}</span>
-                      </div>
-                      <div className="text-[11px] text-zinc-400 mt-1">{ex.targetMuscle}</div>
-                    </div>
-
-                    <div className="shrink-0 text-xs font-bold text-emerald-400">
-                      {isAlreadyAdded ? '추가됨' : '+ 추가'}
-                    </div>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{modalSearch ? `'${modalSearch}' 기구 직접 등록하기` : '새 기구 직접 등록하기'}</span>
                   </button>
-                );
-              })}
+                </div>
+              ) : (
+                <>
+                  {filteredExercisesForModal.map((ex) => {
+                    const isAlreadyAdded = session.logs.some((l) => l.exerciseId === ex.id);
+                    return (
+                      <button
+                        key={ex.id}
+                        disabled={isAlreadyAdded}
+                        onClick={() => handleAddExerciseToWorkout(ex)}
+                        className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-start justify-between ${
+                          isAlreadyAdded
+                            ? 'bg-zinc-950/40 border-zinc-800/40 opacity-50 cursor-not-allowed'
+                            : 'bg-zinc-950 border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-800/50'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-emerald-400">
+                              {ex.category}
+                            </span>
+                            <span className="text-sm font-bold text-white truncate">{ex.name}</span>
+                            {ex.isCustom && (
+                              <span className="text-[9px] bg-zinc-800 text-zinc-400 px-1 py-0.5 rounded">
+                                직접추가
+                              </span>
+                            )}
+                          </div>
+                          {ex.englishName && (
+                            <div className="text-[10px] text-zinc-500 font-mono mt-0.5 truncate">
+                              {ex.englishName}
+                            </div>
+                          )}
+                          <div className="text-[11px] text-zinc-400 mt-1">{ex.targetMuscle}</div>
+                          {ex.alternatives && ex.alternatives.length > 0 && (
+                            <div className="text-[10px] text-amber-400/90 mt-1 flex items-center gap-1">
+                              <span className="text-zinc-500 font-medium shrink-0">대체:</span>
+                              <span className="truncate">{ex.alternatives.slice(0, 2).join(', ')}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="shrink-0 text-xs font-bold text-emerald-400 mt-1">
+                          {isAlreadyAdded ? '추가됨' : '+ 추가'}
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                  <div className="pt-2 pb-1 text-center">
+                    <button
+                      onClick={() => {
+                        setCustomName(modalSearch);
+                        if (modalCategory !== '전체') {
+                          setCustomCategory(modalCategory as ExerciseCategory);
+                        }
+                        setIsCustomFormOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-emerald-400 py-2"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>찾는 기구가 없나요? 내 헬스장 기구 직접 등록</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Custom Exercise Form Modal */}
+      {isCustomFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Plus className="w-4 h-4 text-emerald-400" />
+                내 헬스장 기구 직접 등록
+              </h3>
+              <button
+                onClick={() => setIsCustomFormOpen(false)}
+                className="p-1 text-zinc-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAndAddCustomExercise} className="space-y-3.5">
+              <div>
+                <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                  기구 / 운동 이름 *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="예: 뉴텍 인클라인 체스트 프레스, 힙쓰러스트"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                  운동 부위 *
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['가슴', '등', '하체', '팔', '어깨', '복근/코어'] as ExerciseCategory[]).map((cat) => (
+                    <button
+                      type="button"
+                      key={cat}
+                      onClick={() => setCustomCategory(cat)}
+                      className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all ${
+                        customCategory === cat
+                          ? 'bg-emerald-500 text-zinc-950 border-emerald-500'
+                          : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:bg-zinc-800'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                  자극 부위 (선택)
+                </label>
+                <input
+                  type="text"
+                  value={customTarget}
+                  onChange={(e) => setCustomTarget(e.target.value)}
+                  placeholder="예: 윗가슴, 엉덩이/둔근"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCustomFormOpen(false)}
+                  className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold rounded-xl transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/20"
+                >
+                  등록하고 바로 일지에 추가
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

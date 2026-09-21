@@ -26,15 +26,32 @@ export function getExercises(): Exercise[] {
     }
     const parsed: Exercise[] = JSON.parse(raw);
 
-    // Merge any missing default exercises in case new ones were added
-    const existingIds = new Set(parsed.map((e) => e.id));
+    // Sync any updated default fields (e.g. englishName, alternatives) while preserving custom exercises
+    let hasUpdates = false;
+    const synced = parsed.map((p) => {
+      const def = DEFAULT_EXERCISES.find((d) => d.id === p.id);
+      if (def) {
+        if (!p.englishName && def.englishName) hasUpdates = true;
+        if (!p.alternatives && def.alternatives) hasUpdates = true;
+        return {
+          ...p,
+          englishName: def.englishName || p.englishName,
+          alternatives: def.alternatives || p.alternatives,
+          tips: def.tips || p.tips,
+          targetMuscle: def.targetMuscle || p.targetMuscle,
+        };
+      }
+      return p;
+    });
+
+    const existingIds = new Set(synced.map((e) => e.id));
     const missingDefaults = DEFAULT_EXERCISES.filter((d) => !existingIds.has(d.id));
-    if (missingDefaults.length > 0) {
-      const merged = [...parsed, ...missingDefaults];
+    if (missingDefaults.length > 0 || hasUpdates) {
+      const merged = [...synced, ...missingDefaults];
       localStorage.setItem(STORAGE_KEY_EXERCISES, JSON.stringify(merged));
       return merged;
     }
-    return parsed;
+    return synced;
   } catch (e) {
     console.error('Failed to get exercises from localStorage', e);
     return DEFAULT_EXERCISES;
